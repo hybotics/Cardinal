@@ -19,10 +19,7 @@ def command(triggers):
     return wrap
 
 
-def help(line):
-    if not isinstance(line, basestring):
-        raise TypeError("Help line must be a string")
-
+def help(*lines):
     def wrap(f):
         @functools.wraps(f)
         def inner(*args, **kwargs):
@@ -30,9 +27,9 @@ def help(line):
 
         # Create help list or prepend to it
         if not hasattr(inner, 'help'):
-            inner.help = [line]
+            inner.help = lines
         else:
-            inner.help.insert(0, line)
+            inner.help = lines + inner.help
 
         return inner
 
