@@ -1,3 +1,6 @@
+from cardinal.decorators import command, help
+
+
 class AdminPlugin(object):
     # A dictionary which will contain the owner nicks and vhosts
     owners = None
@@ -23,112 +26,121 @@ class AdminPlugin(object):
     # A command to quickly check whether a user has permissions to access
     # these commands.
     def is_owner(self, user):
-        if user.group(3) in self.trusted_vhosts:
+        _, _, vhost = user
+        if vhost in self.trusted_vhosts:
             return True
 
         return False
 
+    @command('eval')
+    @help("A dangerous command that runs eval() on the input. (admin only)",
+          "Syntax: .eval <command>")
     def eval(self, cardinal, user, channel, msg):
-        if self.is_owner(user):
-            command = ' '.join(msg.split()[1:])
-            if len(command) > 0:
-                try:
-                    output = str(eval(command))
-                    cardinal.sendMsg(channel, output)
-                except Exception, e:
-                    cardinal.sendMsg(channel, 'Exception %s: %s' %
-                                              (e.__class__, e))
-                    raise
+        if not self.is_owner(user):
+            return
 
-    eval.commands = ['eval']
-    eval.help = ["A super dangerous command that runs eval() on the input. " +
-                 "(admin only)",
+        command = ' '.join(msg.split()[1:])
+        if len(command) == 0:
+            return
 
-                 "Syntax: .eval <command>"]
+        try:
+            output = str(eval(command))
+            cardinal.sendMsg(channel, output)
+        except Exception, e:
+            cardinal.sendMsg(channel, 'Exception %s: %s' %
+                                      (e.__class__, e))
+            raise
 
+    @command('exec')
+    @help("A dangerous command that runs exec() on the input. (admin only)",
+          "Syntax: .exec <command>")
     def execute(self, cardinal, user, channel, msg):
-        if self.is_owner(user):
-            command = ' '.join(msg.split()[1:])
-            if len(command) > 0:
-                try:
-                    exec(command)
-                    cardinal.sendMsg(channel, "Ran exec() on input.")
-                except Exception, e:
-                    cardinal.sendMsg(channel, 'Exception %s: %s' %
-                                              (e.__class__, e))
-                    raise
+        if not self.is_owner(user):
+            return
+        command = ' '.join(msg.split()[1:])
+        if len(command) == 0:
+            return
 
-    execute.commands = ['exec']
-    execute.help = ["A dangerous command that runs exec() on the input. " +
-                    "(admin only)",
+        try:
+            exec(command)
+            cardinal.sendMsg(channel, "Ran exec() on input.")
+        except Exception, e:
+            cardinal.sendMsg(channel, 'Exception %s: %s' %
+                                      (e.__class__, e))
+            raise
 
-                    "Syntax: .exec <command>"]
-
+    @command('load', 'reload')
+    @help("If no plugins are given after the command, reload all plugins.",
+          "Otherwise, load (or reload) the selected plugins. (admin only)",
+          "Syntax: .reload [plugin [plugin ...]]")
     def load_plugins(self, cardinal, user, channel, msg):
-        if self.is_owner(user):
-            cardinal.sendMsg(channel, "%s: Loading plugins..." % user.group(1))
+        nick, _, _ = user
 
-            plugins = msg.split()
-            plugins.pop(0)
+        if not self.is_owner(user):
+            return
 
-            if len(plugins) == 0:
-                plugins = []
-                for plugin in cardinal.plugin_manager:
-                    plugins.append(plugin['name'])
+        cardinal.sendMsg(channel, "%s: Loading plugins..." % nick)
 
-            failed = cardinal.plugin_manager.load(plugins)
+        plugins = msg.split()
+        plugins.pop(0)
 
-            successful = [
-                plugin for plugin in plugins if plugin not in failed
-            ]
+        if len(plugins) == 0:
+            plugins = []
+            for plugin in cardinal.plugin_manager:
+                plugins.append(plugin['name'])
 
-            if len(successful) > 0:
-                cardinal.sendMsg(channel, "Plugins loaded succesfully: %s." %
-                                          ', '.join(sorted(successful)))
+        failed = cardinal.plugin_manager.load(plugins)
 
-            if len(failed) > 0:
-                cardinal.sendMsg(channel, "Plugins failed to load: %s." %
-                                          ', '.join(sorted(failed)))
+        successful = [
+            plugin for plugin in plugins if plugin not in failed
+        ]
 
-    load_plugins.commands = ['load', 'reload']
-    load_plugins.help = ["If no plugins are given after the command, reload " +
-                         "all plugins. Otherwise, load (or reload) the " +
-                         "selected plugins. (admin only)",
+        if len(successful) > 0:
+            cardinal.sendMsg(channel, "Plugins loaded succesfully: %s." %
+                                      ', '.join(sorted(successful)))
 
-                         "Syntax: .reload [plugin [plugin ...]]"]
+        if len(failed) > 0:
+            cardinal.sendMsg(channel, "Plugins failed to load: %s." %
+                                      ', '.join(sorted(failed)))
 
-    def unload_plugins(self, cardinal, user, channel, msg):
-        nick = user.group(1)
+    @command('unload')
+    @help("Unload the selected plugins. (admin only)",
+          "Syntax: .unload <plugin [plugin ...]>")
+    def unload(self, cardinal, user, channel, msg):
+        nick, _, _ = user
 
-        if self.is_owner(user):
-            plugins = msg.split()
-            plugins.pop(0)
+        if not self.is_owner(user):
+            return
 
-            if len(plugins) == 0:
-                cardinal.sendMsg(channel, "%s: No plugins to unload." % nick)
-                return
+        plugins = msg.split()
+        plugins.pop(0)
 
-            cardinal.sendMsg(channel, "%s: Unloading plugins..." % nick)
+        if len(plugins) == 0:
+            cardinal.sendMsg(channel, "%s: No plugins to unload." % nick)
+            return
 
-            # Returns a list of plugins that weren't loaded to begin with
-            unknown = cardinal.plugin_manager.unload(plugins)
-            successful = [
-                plugin for plugin in plugins if plugin not in unknown
-            ]
+        cardinal.sendMsg(channel, "%s: Unloading plugins..." % nick)
 
-            if len(successful) > 0:
-                cardinal.sendMsg(channel, "Plugins unloaded succesfully: %s." %
-                                          ', '.join(sorted(successful)))
+        # Returns a list of plugins that weren't loaded to begin with
+        unknown = cardinal.plugin_manager.unload(plugins)
+        successful = [
+            plugin for plugin in plugins if plugin not in unknown
+        ]
 
-            if len(unknown) > 0:
-                cardinal.sendMsg(channel, "Unknown plugins: %s." %
-                                          ', '.join(sorted(unknown)))
+        if len(successful) > 0:
+            cardinal.sendMsg(channel, "Plugins unloaded succesfully: %s." %
+                                      ', '.join(sorted(successful)))
 
-    unload_plugins.commands = ['unload']
-    unload_plugins.help = ["Unload selected plugins. (admin only)",
-                           "Syntax: .unload <plugin [plugin ...]>"]
+        if len(unknown) > 0:
+            cardinal.sendMsg(channel, "Unknown plugins: %s." %
+                                      ', '.join(sorted(unknown)))
 
-    def disable_plugins(self, cardinal, user, channel, msg):
+    @command('disable')
+    @help("Disable plugins in a channel. (admin only)",
+          "Syntax: .disable <plugin> <channel [channel ...]>")
+    def disable(self, cardinal, user, channel, msg):
+        nick, _, _ = user
+
         if not self.is_owner(user):
             return
 
@@ -136,11 +148,11 @@ class AdminPlugin(object):
         channels.pop(0)
 
         if len(channels) < 2:
-            cardinal.sendMsg(channel,
-                             "Syntax: .disable <plugin> <channel [channel ...]>")
+            cardinal.sendMsg(
+                channel, "Syntax: .disable <plugin> <channel [channel ...]>")
             return
 
-        cardinal.sendMsg(channel, "%s: Disabling plugins..." % user.group(1))
+        cardinal.sendMsg(channel, "%s: Disabling plugins..." % nick)
 
         # First argument is plugin
         plugin = channels.pop(0)
@@ -153,11 +165,12 @@ class AdminPlugin(object):
         cardinal.sendMsg(channel, "Added to blacklist: %s." %
                                   ', '.join(sorted(channels)))
 
-    disable_plugins.commands = ['disable']
-    disable_plugins.help = ["Disable plugins in a channel. (admin only)",
-                            "Syntax: .disable <plugin> <channel [channel ...]>"]
+    @command('enable')
+    @help("Enable plugins in a channel. (admin only)",
+          "Syntax: .enable <plugin> <channel [channel ...]>")
+    def enable(self, cardinal, user, channel, msg):
+        nick, _, _ = user
 
-    def enable_plugins(self, cardinal, user, channel, msg):
         if not self.is_owner(user):
             return
 
@@ -165,11 +178,10 @@ class AdminPlugin(object):
         channels.pop(0)
 
         if len(channels) < 2:
-            cardinal.sendMsg(channel,
-                             "Syntax: .enable <plugin> <channel [channel ...]>")
-            return
+            return cardinal.sendMsg(
+                channel, "Syntax: .enable <plugin> <channel [channel ...]>")
 
-        cardinal.sendMsg(channel, "%s: Enabling plugins..." % user.group(1))
+        cardinal.sendMsg(channel, "%s: Enabling plugins..." % nick)
 
         # First argument is plugin
         plugin = channels.pop(0)
@@ -179,7 +191,7 @@ class AdminPlugin(object):
             cardinal.sendMsg("Plugin %s does not exist" % plugin)
 
         successful = [
-            channel for channel in channels if channel not in not_blacklisted
+            chan for chan in channels if chan not in not_blacklisted
         ]
 
         if len(successful) > 0:
@@ -190,21 +202,21 @@ class AdminPlugin(object):
             cardinal.sendMsg(channel, "Wasn't in blacklist: %s." %
                                       ', '.join(sorted(not_blacklisted)))
 
-    enable_plugins.commands = ['enable']
-    enable_plugins.help = ["Enable plugins in a channel. (admin only)",
-                           "Syntax: .enable <plugin> <channel [channel ...]>"]
-
+    @command('join')
+    @help("Join selected channels. (admin only)",
+          "Syntax: .join <channel [channel ...]>")
     def join(self, cardinal, user, channel, msg):
-        if self.is_owner(user):
-            channels = msg.split()
-            channels.pop(0)
-            for channel in channels:
-                cardinal.join(channel)
+        if not self.is_owner(user):
+            return
 
-    join.commands = ['join']
-    join.help = ["Joins selected channels. (admin only)",
-                 "Syntax: .join <channel [channel ...]>"]
+        channels = msg.split()
+        channels.pop(0)
+        for channel in channels:
+            cardinal.join(channel)
 
+    @command('part')
+    @help("Part selected channels. (admin only)",
+          "Syntax: .join <channel [channel ...]>")
     def part(self, cardinal, user, channel, msg):
         if not self.is_owner(user):
             return
@@ -217,28 +229,21 @@ class AdminPlugin(object):
         elif channel != user:
             cardinal.part(channel)
 
-    part.commands = ['part']
-    part.help = ["Parts selected channels. (admin only)",
-                 "Syntax: .join <channel [channel ...]>"]
-
+    @command('quit')
+    @help("Quits the network with a quit message, if one is defined. "
+          "(admin only)",
+          "Syntax: .quit [message]")
     def quit(self, cardinal, user, channel, msg):
         if self.is_owner(user):
             cardinal.disconnect(' '.join(msg.split(' ')[1:]))
 
-    quit.commands = ['quit']
-    quit.help = ["Quits the network with a quit message, if one is defined. " +
-                 "(admin only)",
-
-                 "Syntax: .quit [message]"]
-
+    @command('dbg_quit')
+    @help("Quits the network without setting disconnect flag (for testing "
+          "purposes, admin only)",
+          "Syntax: .dbg_quit")
     def debug_quit(self, cardinal, user, channel, msg):
         if self.is_owner(user):
             cardinal.quit('Debug disconnect')
-    debug_quit.commands = ['dbg_quit']
-    debug_quit.help = ["Quits the network without setting disconnect flag " +
-                       "(for testing reconnection, admin only)",
-
-                       "Syntax: .dbg_quit"]
 
 
 def setup(cardinal, config):
