@@ -1,13 +1,17 @@
+from cardinal.decorators import command, help
+
+
 class PingPlugin(object):
+    @command("ping")
+    @help("Responds to a ping message with 'Pong.'",
+          "Syntax: .ping")
     def pong(self, cardinal, user, channel, msg):
-        if channel != user:
-            cardinal.sendMsg(channel, "%s: Pong." % user.group(1))
+        nick, _, _ = user
+        if channel != nick:
+            cardinal.sendMsg(channel, "%s: Pong." % nick)
         else:
             cardinal.sendMsg(channel, "Pong.")
 
-    pong.regex = r'(?i)^ping[.?!]?$'
-    pong.commands = ['ping']
-    pong.help = "Responds to a ping message with 'Pong.'"
 
 def setup():
     return PingPlugin()
