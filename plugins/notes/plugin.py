@@ -3,6 +3,8 @@ import re
 import logging
 import sqlite3
 
+from cardinal.decorators import command, help
+
 NOTE_REGEX = re.compile(r'^!([^\s]+.*)')
 
 
@@ -23,9 +25,11 @@ class NotesPlugin(object):
         self._connect_or_create_db(cardinal)
 
     def join_callback(self, cardinal, user, channel):
-        content = self._get_note_from_db(user.group(1))
+        nick, _, _ = user
+        content = self._get_note_from_db(nick)
+
         if content:
-            cardinal.sendMsg(channel, "[%s] %s" % (user.group(1), content))
+            cardinal.sendMsg(channel, "[%s] %s" % (nick, content))
 
     def _connect_or_create_db(self, cardinal):
         try:
@@ -45,6 +49,9 @@ class NotesPlugin(object):
                   "content text collate nocase)")
         self.conn.commit()
 
+    @command('addnote')
+    @help("Saves a note to the database for retrieval later.",
+          "Syntax: .addnote <title>=<content>")
     def add_note(self, cardinal, user, channel, msg):
         if not self.conn:
             cardinal.sendMsg("Unable to access notes database.")
@@ -69,10 +76,9 @@ class NotesPlugin(object):
 
         cardinal.sendMsg(channel, "Saved note '%s'." % title)
 
-    add_note.commands = ['addnote']
-    add_note.help = ["Saves a note to the database for retrieval later.",
-                     "Syntax: .addnote <title>=<content>"]
-
+    @command('delnote')
+    @help("Deletes a note from the database.",
+          "Syntax: .delnote <title>")
     def delete_note(self, cardinal, user, channel, msg):
         if not self.conn:
             cardinal.sendMsg(channel, "Unable to access notes database.")
@@ -97,10 +103,9 @@ class NotesPlugin(object):
 
         cardinal.sendMsg(channel, "Deleted note saved under '%s'." % title)
 
-    delete_note.commands = ['delnote']
-    delete_note.help = ["Deletes a note from the database.",
-                        "Syntax: .delnote <title>"]
-
+    @command("note")
+    @help("Retrieve a saved note.",
+          "Syntax: .note <title>")
     def get_note(self, cardinal, user, channel, msg):
         if not self.conn:
             cardinal.sendMsg(channel, "Unable to access notes database.")
@@ -125,10 +130,7 @@ class NotesPlugin(object):
 
         cardinal.sendMsg(channel, "%s: %s" % (title, content))
 
-    get_note.commands = ["note"]
     get_note.regex = NOTE_REGEX
-    get_note.help = ["Retrieve a saved note.",
-                     "Syntax: .note <title>"]
 
     def _get_note_from_db(self, title):
         c = self.conn.cursor()
