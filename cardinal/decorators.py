@@ -1,12 +1,10 @@
 import functools
 
 
-def command(triggers):
-    if isinstance(triggers, basestring):
-        triggers = [triggers]
-
-    if not isinstance(triggers, list):
-        raise TypeError("Command must be a trigger string or list of triggers")
+def command(*triggers):
+    # backwards compatibility
+    if len(triggers) == 1 and isinstance(triggers[0], list):
+        triggers = tuple(triggers[0])
 
     def wrap(f):
         @functools.wraps(f)

@@ -4,13 +4,25 @@ import decorators
 
 
 @pytest.mark.parametrize("input,expected", [
-    ('foo', ['foo']),
-    (['foo'], ['foo']),
-    (['foo', 'bar'], ['foo', 'bar']),
+    (
+        ('foo',),
+        ('foo',)
+    ),
+    (
+        (['foo'],),
+        ('foo',),
+    ),
+    (
+        (['foo', 'bar']),
+        ('foo', 'bar'),
+    ),
+    (
+        ('foo', 'bar'),
+        ('foo', 'bar')),
 ])
 def test_command(input, expected):
     # ensure commands is a list with foo added
-    @decorators.command(input)
+    @decorators.command(*input)
     def foo():
         pass
 
@@ -24,7 +36,7 @@ def test_command_overwrites():
     def foo():
         pass
 
-    assert foo.commands == ['foo']
+    assert foo.commands == ('foo',)
 
 
 def test_command_function_wrap():
@@ -35,23 +47,6 @@ def test_command_function_wrap():
 
     assert foo(3, baz=4) == 7
     assert foo(5, 5) == 10
-
-
-@pytest.mark.parametrize("value", [
-    True,
-    False,
-    5,
-    3.14,
-    ('foo',),
-    {'foo': 'bar'},
-    object(),
-])
-def test_command_exceptions(value):
-    # only allow strings and lists
-    with pytest.raises(TypeError):
-        @decorators.command(value)
-        def foo():
-            pass
 
 
 @pytest.mark.parametrize("params", (
