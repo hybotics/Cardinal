@@ -7,19 +7,20 @@ import logging
 from cardinal.decorators import command, help
 
 TOP_ARTIST_URL = "http://ws.audioscrobbler.com/2.0/?" \
-                 "method=user.gettopartists" \
+                 "method=user.gettopartists&limit=500" \
                  "&user={0}&api_key={1}&format=json"
 
 RECENT_TRACKS_URL = "http://ws.audioscrobbler.com/2.0/?" \
                     "method=user.getrecenttracks" \
                     "&user={0}&api_key={1}&limit=1&format=json"
 
-LAST_FM_ERROR = {6:"Your Last.fm username is incorrect. "
-                   "No user exists by that username.",
-                 7:"One of the Last.fm usernames was invalid. " \
-                   "Please try again.",
-                 10:"Last.fm plugin is not configured. " \
-                    "Please set API key."}
+LAST_FM_ERROR = {6: "Your Last.fm username is incorrect. "
+                    "No user exists by that username.",
+                 7: "One of the Last.fm usernames was invalid. "
+                    "Please try again.",
+                 10: "Last.fm plugin is not configured. "
+                     "Please set API key."}
+
 
 class LastfmPlugin(object):
     logger = None
@@ -113,7 +114,7 @@ class LastfmPlugin(object):
             "Your Last.fm username is now set to {0}".format(username)
         )
 
-    @command('np', 'nowplaying')
+    @command(['np', 'nowplaying'])
     @help("Get the Last.fm track currently played by a user "
           "(defaults to username set with .setlastfm)")
     @help("Syntax: .np [username]")
@@ -173,21 +174,16 @@ class LastfmPlugin(object):
         try:
             uh = urllib2.urlopen(
                 RECENT_TRACKS_URL.format(username,
-                                         self.api_key)
+                                         self.api_key))
             content = json.load(uh)
         except Exception:
             cardinal.sendMsg(channel, "Unable to connect to Last.fm.")
             self.logger.exception("Failed to connect to Last.fm")
             return
 
-        if content.has_key("error"):
-            cardinal.sendMsg(
-                channel,
-                LAST_FM_ERROR[content["error"]]
-            )
-            self.logger.error(
-                LAST_FM_ERROR[content["error"]]
-            )
+        if "error" in content:
+            cardinal.sendMsg(channel, LAST_FM_ERROR[content["error"]])
+            self.logger.error(LAST_FM_ERROR[content["error"]])
             return
 
         try:
@@ -208,7 +204,7 @@ class LastfmPlugin(object):
 
     @command('compare')
     @help("Uses Last.fm to compare the compatibility of music "
-                    "between two users.")
+          "between two users.")
     @help("Syntax: .compare <username> [username]")
     def compare(self, cardinal, user, channel, msg):
         # Before we do anything, let's make sure we'll be able to query Last.fm
@@ -276,7 +272,7 @@ class LastfmPlugin(object):
             uh = urllib2.urlopen(TOP_ARTIST_URL.format(username1,
                                                        self.api_key))
             user1 = json.load(uh)
-            uh = urllib2.urlopen(TOP_ARTIST_URL.format(username2, 
+            uh = urllib2.urlopen(TOP_ARTIST_URL.format(username2,
                                                        self.api_key))
             user2 = json.load(uh)
         except Exception:
@@ -284,24 +280,14 @@ class LastfmPlugin(object):
             self.logger.exception("Failed to connect to Last.fm")
             return
 
-        if user1.has_key("error"):
-            cardinal.sendMsg(
-                channel,
-                LAST_FM_ERROR[content["error"]]
-            )
-            self.logger.error(
-                LAST_FM_ERROR[content["error"]]
-            )
+        if "error" in user1:
+            cardinal.sendMsg(channel, LAST_FM_ERROR[user1["error"]])
+            self.logger.error(LAST_FM_ERROR[user1["error"]])
             return
-        
-        if user2.has_key("error"):
-            cardinal.sendMsg(
-                channel,
-                LAST_FM_ERROR[content["error"]]
-            )
-            self.logger.error(
-                LAST_FM_ERROR[content["error"]]
-            )
+
+        if "error" in user2:
+            cardinal.sendMsg(channel, LAST_FM_ERROR[user2["error"]])
+            self.logger.error(LAST_FM_ERROR[user2["error"]])
             return
 
         try:
@@ -312,15 +298,15 @@ class LastfmPlugin(object):
             for artist in user2["topartists"]["artist"]:
                 if artist["name"] in user1_artists:
                     liked_artists.append(artist["name"].encode("utf-8"))
-            
+
             score = (float(len(liked_artists)) / float(50)) * 100
 
             cardinal.sendMsg(
                 channel,
                 "According to Last.fm's Tasteometer, {0} and {1}'s music "
                 "preferences are {2}% compatible! Some artists they have in "
-                "common include: {3}".format(str(username1), 
-                                             str(username2), 
+                "common include: {3}".format(str(username1),
+                                             str(username2),
                                              int(score),
                                              ', '.join(liked_artists[:5]))
             )
