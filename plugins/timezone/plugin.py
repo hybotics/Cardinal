@@ -1,9 +1,10 @@
 from datetime import datetime
 
-from cardinal.decorators import command, help
-
 import pytz
 from pytz.exceptions import UnknownTimeZoneError
+
+from cardinal.decorators import command, help
+
 
 TIME_FORMAT = '%b %d, %I:%M:%S %p UTC%z'
 
