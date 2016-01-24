@@ -4,6 +4,8 @@ import json
 import urllib2
 import logging
 
+from cardinal.decorators import command, help
+
 
 class LastfmPlugin(object):
     logger = None
@@ -47,6 +49,9 @@ class LastfmPlugin(object):
         )
         self.conn.commit()
 
+    @command('setlastfm')
+    @help("Sets the default Last.fm username for your nick.",
+          "Syntax: .setlastfm <username>")
     def set_user(self, cardinal, user, channel, msg):
         if not self.conn:
             cardinal.sendMsg(
@@ -67,8 +72,7 @@ class LastfmPlugin(object):
             cardinal.sendMsg(channel, "Syntax: .setlastfm <username>")
             return
 
-        nick = user.group(1)
-        vhost = user.group(3)
+        nick, _, vhost = user
         username = message[1]
 
         c = self.conn.cursor()
@@ -94,10 +98,10 @@ class LastfmPlugin(object):
             "Your Last.fm username is now set to %s." % username
         )
 
-    set_user.commands = ['setlastfm']
-    set_user.help = ["Sets the default Last.fm username for your nick.",
-                     "Syntax: .setlastfm <username>"]
-
+    @command('np', 'nowplaying')
+    @help("Get the Last.fm track currently played by a user (defaults to "
+          "username set with .setlastfm)",
+          "Syntax: .np [username]")
     def now_playing(self, cardinal, user, channel, msg):
         # Before we do anything, let's make sure we'll be able to query Last.fm
         if self.api_key is None:
@@ -134,8 +138,7 @@ class LastfmPlugin(object):
             nick = message[1]
             c.execute("SELECT username FROM users WHERE nick=?", (nick,))
         else:
-            nick = user.group(1)
-            vhost = user.group(3)
+            nick, _, vhost = user
             c.execute(
                 "SELECT username FROM users WHERE nick=? OR vhost=?",
                 (nick, vhost)
@@ -147,7 +150,7 @@ class LastfmPlugin(object):
             try:
                 username = message[1]
             except IndexError:
-                username = user.group(1)
+                username = user[0]
         else:
             username = result[0]
 
@@ -196,11 +199,9 @@ class LastfmPlugin(object):
                 "(Is your Last.fm username correct?)"
             )
 
-    now_playing.commands = ['np', 'nowplaying']
-    now_playing.help = ["Get the Last.fm track currently played by a user "
-                        "(defaults to username set with .setlastfm)",
-                        "Syntax: .np [username]"]
-
+    @command('compare')
+    @help("Compare Last.fm music compatibility",
+          "Syntax: .compare <username> [username]")
     def compare(self, cardinal, user, channel, msg):
         # Before we do anything, let's make sure we'll be able to query Last.fm
         if self.api_key is None:
@@ -249,8 +250,7 @@ class LastfmPlugin(object):
             nick = message[2]
             c.execute("SELECT username FROM users WHERE nick=?", (nick,))
         else:
-            nick = user.group(1)
-            vhost = user.group(3)
+            nick, _, vhost = user
             c.execute(
                 "SELECT username FROM users WHERE nick=? OR vhost=?",
                 (nick, vhost)
@@ -324,11 +324,6 @@ class LastfmPlugin(object):
         except KeyError:
             cardinal.sendMsg(channel, "An unknown error has occurred.")
             self.logger.exception("An unknown error occurred comparing users")
-
-    compare.commands = ['compare']
-    compare.help = ["Uses Last.fm to compare the compatibility of music "
-                    "between two users.",
-                    "Syntax: .compare <username> [username]"]
 
     def close(self):
         if self.conn:
