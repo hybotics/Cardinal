@@ -4,6 +4,7 @@ import logging
 
 from bs4 import BeautifulSoup
 
+from cardinal.decorators import command, help
 from cardinal.exceptions import EventRejectedMessage
 
 ARTICLE_URL_REGEX = "https?:\/\/(?:\w{2}\.)?wikipedia\..{2,4}\/wiki\/(.+)"
@@ -22,14 +23,15 @@ class WikipediaPlugin(object):
             self._max_description_length = config['max_description_length']
         except KeyError:
             self.logger.warning("No max description length in config -- using"
-                " defaults: %d" % DEFAULT_MAX_DESCRIPTION_LENGTH)
+                                " defaults: %d" %
+                                DEFAULT_MAX_DESCRIPTION_LENGTH)
             self._max_description_length = DEFAULT_MAX_DESCRIPTION_LENGTH
 
         try:
             self._language_code = config['language_code']
         except KeyError:
             self.logger.warning("No language in config -- using defaults: %s" %
-                DEFAULT_LANGUAGE_CODE)
+                                DEFAULT_LANGUAGE_CODE)
             self._language_code = DEFAULT_LANGUAGE_CODE
 
         self._callback_id = cardinal.event_manager.register_callback(
@@ -42,7 +44,7 @@ class WikipediaPlugin(object):
         try:
             uh = urllib2.urlopen(url)
             soup = BeautifulSoup(uh)
-        except Exception, e:
+        except Exception:
             self.logger.warning(
                 "Couldn't query Wikipedia (404?) for: %s" % name, exc_info=True
             )
@@ -62,7 +64,7 @@ class WikipediaPlugin(object):
                     '...'
             else:
                 first_paragraph = first_paragraph
-        except Exception, e:
+        except Exception:
             self.logger.error(
                 "Error parsing Wikipedia result for: %s" % name,
                 exc_info=True
@@ -70,7 +72,8 @@ class WikipediaPlugin(object):
 
             return "Error parsing Wikipedia result for: %s" % name
 
-        return ("[ Wikipedia: %s | %s | %s ]" % (title, first_paragraph, url)).encode('utf-8')
+        return ("[ Wikipedia: %s | %s | %s ]" %
+                (title, first_paragraph, url)).encode('utf-8')
 
     def url_callback(self, cardinal, channel, url):
         match = re.match(ARTICLE_URL_REGEX, url)
@@ -80,20 +83,20 @@ class WikipediaPlugin(object):
         article_info = self._get_article_info(match.group(1))
         cardinal.sendMsg(channel, article_info)
 
+    @command('wiki', 'wikipedia')
+    @help("Gets a summary and link to a Wikipedia page",
+          "Syntax: .wiki <article>")
     def lookup_article(self, cardinal, user, channel, message):
         name = message.split(' ', 1)[1]
 
         article_info = self._get_article_info(name)
         cardinal.sendMsg(channel, article_info)
 
-    lookup_article.commands = ['wiki', 'wikipedia']
-    lookup_article.help = ["Gets a summary and link to a Wikipedia page",
-                           "Syntax: .wiki <article>"]
-
     def close(self, cardinal):
         """Removes registered callback."""
         cardinal.event_manager.remove_callback(
             "urls.detection", self._callback_id)
+
 
 def setup(cardinal, config):
     return WikipediaPlugin(cardinal, config)
