@@ -15,7 +15,6 @@ You can join us at #cardinal on the [DarkScience](http://www.darkscience.net/) I
 Anything, as long as you're creative enough! But Cardinal does come with some plugins to get you started...
 
 * Fetching URL information (custom parsers for Github, YouTube, and Wikipedia)
-* On-the-fly Googling
 * Weather lookup
 * Last.fm integration
 * Reminders
