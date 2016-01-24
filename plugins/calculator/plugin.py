@@ -1,10 +1,12 @@
-import sys
 import json
 import urllib
 import urllib2
 import logging
 
+from cardinal.decorators import command, help
+
 MATHJS_API = "http://math.leftforliving.com"
+
 
 class CalculatorPlugin(object):
     logger = None
@@ -14,7 +16,12 @@ class CalculatorPlugin(object):
         # Initialize logging
         self.logger = logging.getLogger(__name__)
 
+    @command('calc', 'c', 'calculate')
+    @help("Calculate using math.js API",
+          "Syntax: .calc <query>")
     def calculate(self, cardinal, user, channel, msg):
+        nick, _, _ = user
+
         # Grab the search query
         try:
             question = msg.split(' ', 1)[1]
@@ -24,8 +31,9 @@ class CalculatorPlugin(object):
 
         try:
             c_request = {'question': question}
-            uh = urllib2.urlopen(MATHJS_API + "/query?" + urllib.urlencode(c_request))
-        except Exception, e:
+            uh = urllib2.urlopen(MATHJS_API + "/query?" +
+                                 urllib.urlencode(c_request))
+        except Exception:
             cardinal.sendMsg(channel, "Unable to reach evaluation server.")
             self.logger.exception("Unable to connect to evaluation server")
             return
@@ -43,13 +51,12 @@ class CalculatorPlugin(object):
         try:
             answer = response['answer']
 
-            cardinal.sendMsg(channel, "%s = %s" % (str(question), str(answer)))
+            cardinal.sendMsg(channel, "%s: %s = %s" %
+                             (nick, str(question), str(answer)))
         except IndexError:
-            cardinal.sendMsg(channel, "An error occurred while processing the calculation.")
+            cardinal.sendMsg(
+                channel, "An error occurred while processing the calculation.")
 
-    calculate.commands = ['calc', 'c', 'calculate']
-    calculate.help = ["Calculate using math.js API.",
-                      "Syntax: .calc <query>"]
 
 def setup():
     return CalculatorPlugin()
