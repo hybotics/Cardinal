@@ -1,0 +1,158 @@
+#!/usr/bin/env python
+
+import os
+
+import click
+
+CARDINAL_VERSION = '3.0.0'
+
+# click settings
+CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
+
+
+@click.group(context_settings=CONTEXT_SETTINGS)
+@click.version_option(CARDINAL_VERSION)
+def cli():
+    """
+    Cardinal IRC bot
+
+    A Python IRC bot, with plugin support! Designed to be simple to use, and
+    fun to develop with. For information on developing plugins, or more info
+    about Cardinal, visit the Github page.
+
+    https://github.com/JohnMaguire/Cardinal
+    """
+
+
+@click.command()
+@click.argument('network',
+                envvar='CARDINAL_NETWORK')
+@click.option('--nick', '-n',
+              envvar='CARDINAL_NICK',
+              help='Nick to connect with')
+@click.option('--password', '-p',
+              is_flag=True, default=False,
+              help='Prompt for NickServ password')
+@click.option('--storage', '-s',
+              envvar='CARDINAL_STORAGE', type=click.Path(),
+              default=os.path.expanduser("~") + "/.cardinal",
+              help='Path to storage directory')
+def connect(network, nick, password, storage):
+    """
+    Connects to a saved network. You may optionally override the default nick
+    and NickServ password, or set a custom storage directory path.
+
+    To see the available networks try:
+
+        cardinal network list
+
+    Or for more information about networks:
+
+        cardinal network -h
+    """
+    # prompt for password if the flag is set, otherwise check to see if it's
+    # set in the environment
+    if password:
+        password = click.prompt("NickServ password", hide_input=True)
+    elif 'CARDINAL_PASSWORD' in os.environ:
+        password = os.environ['CARDINAL_PASSWORD']
+
+    print network
+    print nick
+    print password
+    print storage
+cli.add_command(connect)
+
+
+@click.group()
+def config():
+    """
+    List and modify config values.
+
+    You can use dot notation to navigate through the config dictionary. Config
+    values are set on networks, although network-level defaults can be set
+    using the default network. Network configs are merged on top of the default
+    config.
+
+    To see all config values:
+
+        cardinal config get
+
+    To set a default config value:
+
+        cardinal config set default.nick Cardinal
+
+    To learn more about networks try:
+
+        cardinal network -h
+    """
+    pass
+cli.add_command(config)
+
+
+@click.command(name='set')
+def config_set():
+    pass
+config.add_command(config_set)
+
+
+@click.command(name='unset')
+def config_unset():
+    pass
+config.add_command(config_unset)
+
+
+@click.command(name='get')
+def config_get():
+    pass
+config.add_command(config_get)
+
+
+@click.command(name='append')
+def config_append():
+    pass
+config.add_command(config_append)
+
+
+@click.command(name='remove')
+def config_remove():
+    pass
+config.add_command(config_remove)
+
+
+@click.group()
+def network():
+    """
+    List and modify networks.
+
+    Networks are the foundation for configuring Cardinal. A network config
+    contains at minimum a single server to connect to. It may also contain a
+    nickname to connect to the network with, a NickServ password, and custom
+    plugin configuration (including autoload functionality and plugin config.)
+
+    There is also a default network config, which is used as the base config
+    for networks -- any settings defined in the default config will be copied
+    into the network config for any missing config options.
+
+    To create a network:
+
+        cardinal network create <name>
+
+    To delete a network:
+
+        cardinal network delete <name>
+    """
+    pass
+cli.add_command(network)
+
+
+@click.command(name='create')
+def network_create():
+    pass
+network.add_command(network_create)
+
+
+@click.command(name='delete')
+def network_delete():
+    pass
+network.add_command(network_delete)
