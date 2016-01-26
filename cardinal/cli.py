@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-
 import os
+import sys
 
 import click
 
@@ -111,12 +111,52 @@ def config():
 cli.add_command(config)
 
 
+def yield_config(config, prefix=''):
+    for key, value in config.items():
+        if isinstance(value, dict):
+            for key, value in yield_config(value, prefix + key + '.'):
+                yield (key, value)
+        else:
+            yield (prefix + key, value)
+
+
+def resolve_config(config, setting):
+    path = setting.split('.')
+    path.reverse()
+    while len(path) > 0:
+        config = config[path.pop()]
+
+    return config
+
+
 @click.command(name='set')
 @click.argument('setting', required=False)
 @click.argument('value', required=False)
 @click.pass_context
 def config_set(ctx, setting, value):
-    print ctx.obj['CONFIG'].default
+    prefix = 'default.'
+
+    if setting and setting.strip('.'):
+        setting = setting.strip('.')
+
+        # attempt to resolve the config item
+        config = resolve_config(ctx.obj['CONFIG'].default, setting)
+
+        # if it's a simple value, print it and exit
+        if not isinstance(config, dict):
+            click.echo("default.%s = %s" % (setting, config))
+            sys.exit(0)
+
+        # otherwise update the prefix for printing, and we'll print all items
+        # under the dict
+        prefix = prefix + setting + '.'
+    else:
+        # if no setting is passed, use the defaults
+        config = ctx.obj['CONFIG'].default
+
+    for key, val in yield_config(config, prefix=prefix):
+        click.echo("%s = %s" % (key, val))
+
 config.add_command(config_set)
 
 
