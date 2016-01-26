@@ -1,5 +1,8 @@
+import os
+import errno
 import logging
 import json
+import yaml
 import inspect
 
 
@@ -83,7 +86,7 @@ class ConfigSpec(object):
             return value
 
 
-class ConfigParser(object):
+class OldConfigParser(object):
     """A class to make parsing of JSON configs easier.
 
     This class adds support for both the internal Cardinal config as well as
@@ -232,3 +235,30 @@ class ConfigParser(object):
                 )
 
         return self.config
+
+
+class ConfigParser(object):
+    def __init__(self):
+        self.default = {}
+        self.logger = logging.getLogger(__name__)
+
+    def init_directory(self, directory):
+        self.directory = directory
+
+        try:
+            os.makedirs(self.directory)
+        except OSError, e:
+            if e.errno != errno.EEXIST:
+                raise
+
+        self._load_or_create_default()
+
+    def _load_or_create_default(self):
+        with open(os.path.join(self.directory, 'default.yml'), 'a+') as file:
+            config = yaml.load(file)
+            if config is None:
+                yaml.dump(self.default, file)
+
+        # if we found config, merge it into our default
+        if config is not None:
+            self.default.update(config)

@@ -4,15 +4,23 @@ import os
 
 import click
 
+from cardinal.config import ConfigParser
+
 CARDINAL_VERSION = '3.0.0'
 
 # click settings
-CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
+CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'],
+                        obj={'STORAGE': None, 'CONFIG': None})
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.version_option(CARDINAL_VERSION)
-def cli():
+@click.option('--storage', '-s',
+              envvar='CARDINAL_STORAGE', type=click.Path(),
+              default=os.path.expanduser("~") + "/.cardinal",
+              help='Path to storage directory')
+@click.pass_context
+def cli(ctx, storage):
     """
     Cardinal IRC bot
 
@@ -22,6 +30,20 @@ def cli():
 
     https://github.com/JohnMaguire/Cardinal
     """
+    config = ConfigParser()
+
+    ctx.obj['STORAGE'] = storage
+    ctx.obj['CONFIG'] = config
+
+    config.default = {
+        'nick': 'Cardinal',
+        'plugins': {
+            'admin': {'enabled': True},
+            'urls': {'enabled': True},
+        }
+    }
+
+    config.init_directory(os.path.join(storage, 'config'))
 
 
 @click.command()
@@ -33,11 +55,8 @@ def cli():
 @click.option('--password', '-p',
               is_flag=True, default=False,
               help='Prompt for NickServ password')
-@click.option('--storage', '-s',
-              envvar='CARDINAL_STORAGE', type=click.Path(),
-              default=os.path.expanduser("~") + "/.cardinal",
-              help='Path to storage directory')
-def connect(network, nick, password, storage):
+@click.pass_context
+def connect(ctx, network, nick, password):
     """
     Connects to a saved network. You may optionally override the default nick
     and NickServ password, or set a custom storage directory path.
@@ -50,6 +69,8 @@ def connect(network, nick, password, storage):
 
         cardinal network -h
     """
+    storage = ctx.obj['STORAGE']
+
     # prompt for password if the flag is set, otherwise check to see if it's
     # set in the environment
     if password:
@@ -91,8 +112,11 @@ cli.add_command(config)
 
 
 @click.command(name='set')
-def config_set():
-    pass
+@click.argument('setting', required=False)
+@click.argument('value', required=False)
+@click.pass_context
+def config_set(ctx, setting, value):
+    print ctx.obj['CONFIG'].default
 config.add_command(config_set)
 
 
