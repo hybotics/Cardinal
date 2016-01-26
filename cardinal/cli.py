@@ -78,10 +78,8 @@ def connect(ctx, network, nick, password):
     elif 'CARDINAL_PASSWORD' in os.environ:
         password = os.environ['CARDINAL_PASSWORD']
 
-    print network
-    print nick
-    print password
-    print storage
+    click.echo("Connecting to %s as %s (using password: %s)" %
+               (network, nick, 'YES' if password else 'NO'))
 cli.add_command(connect)
 
 
@@ -111,53 +109,30 @@ def config():
 cli.add_command(config)
 
 
-def yield_config(config, prefix=''):
-    for key, value in config.items():
-        if isinstance(value, dict):
-            for key, value in yield_config(value, prefix + key + '.'):
-                yield (key, value)
-        else:
-            yield (prefix + key, value)
-
-
-def resolve_config(config, setting):
-    path = setting.split('.')
-    path.reverse()
-    while len(path) > 0:
-        config = config[path.pop()]
-
-    return config
-
-
 @click.command(name='set')
 @click.argument('setting', required=False)
 @click.argument('value', required=False)
 @click.pass_context
 def config_set(ctx, setting, value):
-    prefix = 'default.'
+    pass
+config.add_command(config_set)
 
-    if setting and setting.strip('.'):
+
+@click.command(name='show')
+@click.argument('setting', required=False)
+@click.pass_context
+def config_show(ctx, setting):
+    if setting:
         setting = setting.strip('.')
 
-        # attempt to resolve the config item
-        config = resolve_config(ctx.obj['CONFIG'].default, setting)
+    try:
+        for key, val in ctx.obj['CONFIG'].iterconfig(setting):
+            click.echo("%s = %s" % (key, val))
+    except KeyError:
+        click.echo("invalid setting: %s" % setting)
+        sys.exit(1)
 
-        # if it's a simple value, print it and exit
-        if not isinstance(config, dict):
-            click.echo("default.%s = %s" % (setting, config))
-            sys.exit(0)
-
-        # otherwise update the prefix for printing, and we'll print all items
-        # under the dict
-        prefix = prefix + setting + '.'
-    else:
-        # if no setting is passed, use the defaults
-        config = ctx.obj['CONFIG'].default
-
-    for key, val in yield_config(config, prefix=prefix):
-        click.echo("%s = %s" % (key, val))
-
-config.add_command(config_set)
+config.add_command(config_show)
 
 
 @click.command(name='unset')

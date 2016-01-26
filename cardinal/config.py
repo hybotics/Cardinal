@@ -247,8 +247,8 @@ class ConfigParser(object):
 
         try:
             os.makedirs(self.directory)
-        except OSError, e:
-            if e.errno != errno.EEXIST:
+        except OSError as exc:
+            if exc.errno != errno.EEXIST:
                 raise
 
         self._load_or_create_default()
@@ -262,3 +262,37 @@ class ConfigParser(object):
         # if we found config, merge it into our default
         if config is not None:
             self.default.update(config)
+
+    def iterconfig(self, setting=None):
+        # FIXME kinda hacky?
+        if setting is None:
+            setting = 'default'
+
+        config = self.resolve(setting)
+
+        if not isinstance(config, dict):
+            # if it's not a dictionary, yield the value
+            yield (setting, config)
+        else:
+            # if it's a dictionary, recurse on each setting
+            for key in config.keys():
+                for key, value in self.iterconfig("%s.%s" % (setting, key)):
+                    yield (key, value)
+
+    def resolve(self, setting):
+        # find the path, reverse so we can pop
+        path = setting.split('.')
+        path.reverse()
+
+        # find tree (essentially, config file)
+        tree = path.pop()
+        if tree == 'default':
+            config = self.default.copy()
+        else:
+            raise KeyError("Could not find %s config tree" % tree)
+
+        # recurse into the tree until we find the requested branch/leaf
+        while len(path) > 0:
+            config = config[path.pop()]
+
+        return config
