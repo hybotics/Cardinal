@@ -2,11 +2,13 @@
 import os
 import sys
 
+from appdirs import AppDirs
 import click
 
 from cardinal.config import ConfigParser
 
 CARDINAL_VERSION = '3.0.0'
+DEFAULT_DIRECTORIES = AppDirs("Cardinal", "John Maguire")
 
 # click settings
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'],
@@ -17,7 +19,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'],
 @click.version_option(CARDINAL_VERSION)
 @click.option('--storage', '-s',
               envvar='CARDINAL_STORAGE', type=click.Path(),
-              default=os.path.expanduser("~") + "/.cardinal",
+              default=DEFAULT_DIRECTORIES.user_config_dir,
               help='Path to storage directory')
 @click.pass_context
 def cli(ctx, storage):
