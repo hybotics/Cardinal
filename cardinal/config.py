@@ -256,7 +256,8 @@ class ConfigParser(object):
             if exc.errno != errno.EEXIST:
                 raise
 
-    def set_default(self, config):
+    @property
+    def default(self, config):
         self.default = config
         self.configs['default'] = self.default
 

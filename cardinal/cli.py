@@ -40,13 +40,13 @@ def cli(ctx, storage):
     config.init_directory(os.path.join(storage, 'config'))
 
     # setup default config
-    config.set_default({
+    config.default = {
         'nick': 'Cardinal',
         'plugins': {
             'admin': {'enabled': True},
             'urls': {'enabled': True},
         }
-    })
+    }
 
     # load all configs and write the default config
     config.load_all()
@@ -102,7 +102,7 @@ def config():
 
     To see all config values:
 
-        cardinal config get
+        cardinal config show
 
     To set a default config value:
 
