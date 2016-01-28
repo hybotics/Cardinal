@@ -4,6 +4,7 @@ import logging
 import json
 import yaml
 import inspect
+from collections import defaultdict
 
 
 class ConfigSpec(object):
@@ -238,8 +239,12 @@ class OldConfigParser(object):
 
 
 class ConfigParser(object):
+
+    default_config = 'default'
+
     def __init__(self):
-        self.default = {}
+        self.configs = defaultdict(dict)
+        self.defaults = defaultdict(dict)
         self.logger = logging.getLogger(__name__)
 
     def init_directory(self, directory):
@@ -251,22 +256,50 @@ class ConfigParser(object):
             if exc.errno != errno.EEXIST:
                 raise
 
-        self._load_or_create_default()
+    def set_default(self, config):
+        self.default = config
+        self.configs['default'] = self.default
 
-    def _load_or_create_default(self):
-        with open(os.path.join(self.directory, 'default.yml'), 'a+') as file:
-            config = yaml.load(file)
-            if config is None:
-                yaml.dump(self.default, file)
+    def load_all(self):
+        """Loads all the config files in the config directory."""
+        for filename in os.listdir(self.directory):
+            if filename.endswith('.yml'):
+                config_name = filename[:-4]
+                self.load(config_name)
 
-        # if we found config, merge it into our default
-        if config is not None:
-            self.default.update(config)
+    def load(self, config_name):
+        """Loads a given config file by name. Uses defaults where applicable.
+
+        Loads a YAML file into the parser, by the name of (config).yml.
+        """
+        # grab the default if we have one
+        config = self.default.copy() if self.default else {}
+
+        try:
+            with open(os.path.join(
+                    self.directory, '%s.yml' % config_name), 'r') as file:
+                # load the config and merge it on the default
+                loaded_config = yaml.load(file)
+
+                if loaded_config:
+                    config.update(loaded_config)
+                    self.configs[config_name] = config
+        except OSError as exc:
+            if exc.errno != errno.EEXIST:
+                raise
+
+    def write_all(self):
+        for config_name in self.configs:
+            self.write(config_name)
+
+    def write(self, config_name):
+        filename = os.path.join(self.directory, "%s.yml" % config_name)
+        with open(filename, 'w+') as file:
+            yaml.dump(self.configs[config_name], file)
 
     def iterconfig(self, setting=None):
-        # FIXME kinda hacky?
         if setting is None:
-            setting = 'default'
+            setting = ''
 
         config = self.resolve(setting)
 
@@ -276,20 +309,21 @@ class ConfigParser(object):
         else:
             # if it's a dictionary, recurse on each setting
             for key in config.keys():
-                for key, value in self.iterconfig("%s.%s" % (setting, key)):
+                for key, value in self.iterconfig(("%s.%s" %
+                                                   (setting, key)).strip('.')):
                     yield (key, value)
 
-    def resolve(self, setting):
+    def resolve(self, setting=''):
+        if setting == '':
+            return self.configs
+
         # find the path, reverse so we can pop
         path = setting.split('.')
         path.reverse()
 
-        # find tree (essentially, config file)
-        tree = path.pop()
-        if tree == 'default':
-            config = self.default.copy()
-        else:
-            raise KeyError("Could not find %s config tree" % tree)
+        # find the config
+        config_name = path.pop()
+        config = self.configs[config_name]
 
         # recurse into the tree until we find the requested branch/leaf
         while len(path) > 0:

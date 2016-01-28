@@ -37,15 +37,20 @@ def cli(ctx, storage):
     ctx.obj['STORAGE'] = storage
     ctx.obj['CONFIG'] = config
 
-    config.default = {
+    config.init_directory(os.path.join(storage, 'config'))
+
+    # setup default config
+    config.set_default({
         'nick': 'Cardinal',
         'plugins': {
             'admin': {'enabled': True},
             'urls': {'enabled': True},
         }
-    }
+    })
 
-    config.init_directory(os.path.join(storage, 'config'))
+    # load all configs and write the default config
+    config.load_all()
+    config.write_all()
 
 
 @click.command()
@@ -143,22 +148,10 @@ def config_unset():
 config.add_command(config_unset)
 
 
-@click.command(name='get')
-def config_get():
-    pass
-config.add_command(config_get)
-
-
 @click.command(name='append')
 def config_append():
     pass
 config.add_command(config_append)
-
-
-@click.command(name='remove')
-def config_remove():
-    pass
-config.add_command(config_remove)
 
 
 @click.group()
