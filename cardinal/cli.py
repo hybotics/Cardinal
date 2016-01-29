@@ -42,6 +42,8 @@ def cli(ctx, storage):
     # setup default config
     config.default = {
         'nick': 'Cardinal',
+        'password': "",
+        'servers': [],
         'plugins': {
             'admin': {'enabled': True},
             'urls': {'enabled': True},
@@ -121,7 +123,16 @@ cli.add_command(config)
 @click.argument('value', required=False)
 @click.pass_context
 def config_set(ctx, setting, value):
-    pass
+    config = ctx.obj['CONFIG']
+
+    try:
+        config.set(setting, value)
+    except KeyError as exc:
+        # FIXME: Is there a better way to do this than exc.args[0]?
+        click.echo("invalid setting (%s): %s" % (setting, exc.args[0]))
+        sys.exit(1)
+
+    config.write_all()
 config.add_command(config_set)
 
 
@@ -135,7 +146,7 @@ def config_show(ctx, setting):
     try:
         for key, val in ctx.obj['CONFIG'].iterconfig(setting):
             click.echo("%s = %s" % (key, val))
-    except KeyError:
+    except IndexError:
         click.echo("invalid setting: %s" % setting)
         sys.exit(1)
 

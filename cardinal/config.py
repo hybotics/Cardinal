@@ -4,7 +4,7 @@ import logging
 import json
 import yaml
 import inspect
-from collections import defaultdict
+from collections import defaultdict, Mapping
 
 
 class ConfigSpec(object):
@@ -240,12 +240,12 @@ class OldConfigParser(object):
 
 class ConfigParser(object):
 
-    default_config = 'default'
-
     def __init__(self):
-        self.configs = defaultdict(dict)
-        self.defaults = defaultdict(dict)
         self.logger = logging.getLogger(__name__)
+        self.configs = defaultdict(dict)
+        self.default_config = 'default'
+
+        self.configs[self.default_config] = {}
 
     def init_directory(self, directory):
         self.directory = directory
@@ -257,9 +257,25 @@ class ConfigParser(object):
                 raise
 
     @property
+    def default(self):
+        return self.configs[self.default_config]
+
+    @default.setter
     def default(self, config):
-        self.default = config
-        self.configs['default'] = self.default
+        self.configs[self.default_config] = config
+
+    def define(self, config):
+        self._update(self.default, config)
+
+    @staticmethod
+    def _update(d, u):
+        for k, v in u.iteritems():
+            if isinstance(v, Mapping):
+                r = ConfigParser._update(d.get(k, {}), v)
+                d[k] = r
+            else:
+                d[k] = u[k]
+        return d
 
     def load_all(self):
         """Loads all the config files in the config directory."""
@@ -274,7 +290,7 @@ class ConfigParser(object):
         Loads a YAML file into the parser, by the name of (config).yml.
         """
         # grab the default if we have one
-        config = self.default.copy() if self.default else {}
+        config = self.default
 
         try:
             with open(os.path.join(
@@ -283,11 +299,39 @@ class ConfigParser(object):
                 loaded_config = yaml.load(file)
 
                 if loaded_config:
-                    config.update(loaded_config)
+                    self._update(config, loaded_config)
                     self.configs[config_name] = config
         except OSError as exc:
             if exc.errno != errno.EEXIST:
                 raise
+
+    @staticmethod
+    def _convert_value(value):
+        if value.lower() in ('true', 't'):
+            return True
+        if value.lower() in ('false', 'f'):
+            return False
+        return value
+
+    def set(self, setting, value):
+        path = setting.split('.')
+        leaf = path.pop()
+
+        config = self.resolve('.'.join(path))
+        if not isinstance(config, dict):
+            raise KeyError("%s is not a dictionary" % '.'.join(path))
+
+        try:
+            if isinstance(config[leaf], dict):
+                raise KeyError("%s cannot be set directly (dictionary)" %
+                               setting)
+            if isinstance(config[leaf], list):
+                raise KeyError("%s cannot be set directly (use append)" %
+                               setting)
+        except KeyError:
+            pass
+
+        config[leaf] = self._convert_value(value)
 
     def write_all(self):
         for config_name in self.configs:
@@ -299,7 +343,7 @@ class ConfigParser(object):
             yaml.dump(self.configs[config_name], file)
 
     def iterconfig(self, setting=None):
-        if setting is None:
+        if not setting:
             setting = ''
 
         config = self.resolve(setting)
@@ -314,8 +358,8 @@ class ConfigParser(object):
                                                    (setting, key)).strip('.')):
                     yield (key, value)
 
-    def resolve(self, setting=''):
-        if setting == '':
+    def resolve(self, setting=None):
+        if not setting:
             return self.configs
 
         # find the path, reverse so we can pop
