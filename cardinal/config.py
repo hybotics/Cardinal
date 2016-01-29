@@ -269,6 +269,10 @@ class ConfigParser(object):
 
     @staticmethod
     def _update(d, u):
+        """Updates a nested dictionary (d) with a nested dictionary (u).
+
+        Thanks to Alex Martelli - http://stackoverflow.com/a/3233356/242129
+        """
         for k, v in u.iteritems():
             if isinstance(v, Mapping):
                 r = ConfigParser._update(d.get(k, {}), v)
