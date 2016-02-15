@@ -140,11 +140,10 @@ class ConfigParser(object):
             raise ValueError("Object must be a dict")
 
         if isinstance(json_object, dict):
-            return {
-                self._utf8_json(key, True):
-                    self._utf8_json(value, True)
-                    for key, value in json_object.iteritems()
-            }
+            return dict(
+                (self._utf8_json(key, True), self._utf8_json(value, True))
+                for key, value in json_object.iteritems()
+            )
         elif isinstance(json_object, list):
             return [
                 self._utf8_json(element, True)
