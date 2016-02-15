@@ -60,8 +60,8 @@ class WikipediaPlugin(object):
             first_paragraph = content.p.get_text()
 
             if len(first_paragraph) > self._max_description_length:
-                first_paragraph = first_paragraph[:self._max_description_length] + \
-                    '...'
+                first_paragraph = (
+                    first_paragraph[:self._max_description_length] + '...')
             else:
                 first_paragraph = first_paragraph
         except Exception:

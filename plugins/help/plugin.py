@@ -1,5 +1,6 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from cardinal.decorators import command, help
+
 
 class HelpPlugin(object):
     # Gets a list of owners from the admin plugin instantiated within the
@@ -24,11 +25,11 @@ class HelpPlugin(object):
 
         # Loop through commands registered in Cardinal
         for plugin in cardinal.plugin_manager:
-            for command in plugin['commands']:
-                if hasattr(command, 'commands'):
-                    commands.append(command.commands[0])
-                elif hasattr(command, 'name'):
-                    commands.append(command.name)
+            for command_ in plugin['commands']:
+                if hasattr(command_, 'commands'):
+                    commands.append(command_.commands[0])
+                elif hasattr(command_, 'name'):
+                    commands.append(command_.name)
 
         return commands
 
@@ -40,15 +41,16 @@ class HelpPlugin(object):
         for plugin in cardinal.plugin_manager:
             found_command = False
 
-            for command in plugin['commands']:
+            for command_ in plugin['commands']:
                 # First check if the command responds to the requested command
-                if hasattr(command, 'commands') and help_command in command.commands:
+                if (hasattr(command_, 'commands') and
+                        help_command in command_.commands):
                     found_command = command
                     break
 
                 # Check if the command's name is the requested command
-                if hasattr(command, 'name') and help_command == command.name:
-                    found_command = command
+                if hasattr(command_, 'name') and help_command == command_.name:
+                    found_command = command_
                     break
 
             # If the command was found and has a help file, set the help_text
@@ -83,12 +85,13 @@ class HelpPlugin(object):
     # Give the user a list of valid commands in the bot if no command is
     # provided. If a valid command is provided, return its help text
     @command(['help'])
-    @help("Shows loaded commands if no command is given. Otherwise, returns that command's help string.")
+    @help("Shows loaded commands, or command help")
     @help("Syntax: .help [command]")
     def cmd_help(self, cardinal, user, channel, msg):
         parameters = msg.split()
         if len(parameters) == 1:
-            cardinal.sendMsg(channel, "Loaded commands: %s" % ', '.join(self._get_commands(cardinal)))
+            cardinal.sendMsg(channel, "Loaded commands: %s" %
+                                      ', '.join(self._get_commands(cardinal)))
         else:
             command = parameters[1]
             help = self._get_command_help(cardinal, command)
@@ -98,7 +101,8 @@ class HelpPlugin(object):
             elif isinstance(help, basestring):
                 cardinal.sendMsg(channel, help)
             else:
-                cardinal.sendMsg(channel, "Unable to handle help string returned by module.")
+                cardinal.sendMsg(channel, "Unable to handle help string "
+                                          "returned by module.")
 
     # Sends some basic meta information about the bot
     @command('info')
@@ -126,6 +130,7 @@ class HelpPlugin(object):
             "brought online %s ago. Plugins have been reloaded %s times since "
             "then." % (uptime, booted, meta['reloads'])
         )
+
 
 def setup():
     return HelpPlugin()

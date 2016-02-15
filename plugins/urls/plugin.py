@@ -2,14 +2,19 @@
 
 import re
 import urllib2
-import socket
 import HTMLParser
 import logging
 
 from datetime import datetime
 
-URL_REGEX = re.compile(r"(?:^|\s)((?:https?://)?(?:[a-z0-9.\-]+[.][a-z]{2,4}/?)(?:[^\s()<>]*|\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\))+(?:\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\'\".,<>?]))", flags=re.IGNORECASE|re.DOTALL)
-TITLE_REGEX = re.compile(r'<title(\s+.*?)?>(.*?)</title>', flags=re.IGNORECASE|re.DOTALL)
+URL_REGEX = re.compile(r"(?:^|\s)((?:https?://)?"
+                       "(?:[a-z0-9.\-]+[.][a-z]{2,4}/?)"
+                       "(?:[^\s()<>]*|\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\))"
+                       "+(?:\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\)|[^\s`!()"
+                       "\[\]{};:\'\".,<>?]))", flags=re.IGNORECASE | re.DOTALL)
+
+TITLE_REGEX = re.compile(r'<title(\s+.*?)?>(.*?)</title>',
+                         flags=re.IGNORECASE | re.DOTALL)
 
 
 class URLsPlugin(object):
@@ -60,7 +65,8 @@ class URLsPlugin(object):
                 url = "http://" + url
 
             if (url == self.last_url and self.last_url_at and
-                (datetime.now() - self.last_url_at).seconds < self.lookup_cooloff):
+                    (datetime.now() - self.last_url_at).seconds <
+                    self.lookup_cooloff):
                 return
 
             self.last_url = url
@@ -68,24 +74,26 @@ class URLsPlugin(object):
 
             # Check if another plugin has hooked into this URL and wants to
             # provide information itself
-            hooked = cardinal.event_manager.fire('urls.detection', channel, url)
-            if hooked:
+            if cardinal.event_manager.fire('urls.detection', channel, url):
                 return
 
-            # Attempt to load the page, timing out after a default of ten seconds
+            # Attempt to load the page, timing out after ten seconds
             try:
                 o = urllib2.build_opener()
                 o.addheaders = [
-                    ('User-agent', 'Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/32.0.1667.0 Safari/537.36')
+                    ('User-agent', 'Mozilla/5.0 (Windows NT 6.2; Win64; x64) '
+                                   'AppleWebKit/537.36 (KHTML, like Gecko) '
+                                   'Chrome/32.0.1667.0 Safari/537.36')
                 ]
                 f = o.open(url, timeout=self.timeout)
-            except Exception, e:
+            except Exception:
                 self.logger.exception("Unable to load URL: %s" % url)
                 return
 
             # Attempt to find the title
             content_type = f.info()['content-type']
-            if not (('text/html' in content_type) or ('text/xhtml' in content_type)):
+            if not ('text/html' in content_type or
+                    'text/xhtml' in content_type):
                 return
             content = f.read(self.read_bytes)
             f.close()
@@ -109,6 +117,7 @@ class URLsPlugin(object):
 
     def close(self, cardinal):
         cardinal.event_manager.remove('urls.detection')
+
 
 def setup(cardinal, config):
     return URLsPlugin(cardinal, config)
