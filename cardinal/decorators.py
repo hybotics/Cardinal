@@ -7,29 +7,21 @@ def command(*triggers):
         triggers = tuple(triggers[0])
 
     def wrap(f):
-        @functools.wraps(f)
-        def inner(*args, **kwargs):
-            return f(*args, **kwargs)
-
-        inner.commands = triggers
-        return inner
+        f.commands = triggers
+        return f
 
     return wrap
 
 
 def help(*lines):
     def wrap(f):
-        @functools.wraps(f)
-        def inner(*args, **kwargs):
-            return f(*args, **kwargs)
-
         # Create help list or prepend to it
-        if not hasattr(inner, 'help'):
-            inner.help = lines
+        if not hasattr(f, 'help'):
+            f.help = lines
         else:
-            inner.help = lines + inner.help
+            f.help = lines + f.help
 
-        return inner
+        return f
 
     return wrap
 
@@ -42,11 +34,7 @@ def event(triggers):
         raise TypeError("Event must be a trigger string or list of triggers")
 
     def wrap(f):
-        @functools.wraps(f)
-        def inner(*args, **kwargs):
-            return f(*args, **kwargs)
-
-        inner.events = triggers
-        return inner
+        f.events = triggers
+        return f
 
     return wrap
