@@ -7,6 +7,9 @@ pyOpenSSL==0.15.1
 # Config parsing
 PyYAML==3.11
 
+# Cardinal decorators
+wrapt==1.10.6
+
 # Wikipedia plugin
 beautifulsoup4==4.3.2
 

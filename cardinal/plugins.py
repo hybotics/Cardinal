@@ -734,7 +734,7 @@ class PluginManager(object):
             # it does, and the message given to us matches the regex, then call
             # the command.
             if hasattr(command, 'regex') and re.search(command.regex, message):
-                command(self.cardinal, user, channel, message)
+                self._call_command(command, user, channel, message)
                 called_command = True
                 continue
 
@@ -750,7 +750,7 @@ class PluginManager(object):
                     get_command.group(1) in command.commands):
                 # Matched this command, so call it.
                 called_command = True
-                command(self.cardinal, user, channel, message)
+                self._call_command(command, user, channel, message)
                 continue
 
         # Since standard command regex wasn't found, there's no need to raise
@@ -765,6 +765,31 @@ class PluginManager(object):
             "Command syntax detected, but no matching command found: %s" %
             message
         )
+
+    def _call_command(self, command, user, channel, message):
+        spec = inspect.getargspec(command)
+
+        args = {}
+
+        # Cardinal instance
+        if 'cardinal' in spec.args:
+            args['cardinal'] = self.cardinal
+
+        # Channel
+        if 'channel' in spec.args:
+            args['channel'] = channel
+
+        # User tuple
+        if 'user' in spec.args:
+            args['user'] = user
+
+        # Message
+        if 'message' in spec.args:
+            args['message'] = message
+        if 'msg' in spec.args:
+            args['msg'] = message
+
+        command(**args)
 
 
 class EventManager(object):
