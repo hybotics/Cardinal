@@ -1,6 +1,3 @@
-import functools
-
-
 def command(*triggers):
     # backwards compatibility
     if len(triggers) == 1 and isinstance(triggers[0], list):
