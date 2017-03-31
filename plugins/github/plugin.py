@@ -92,6 +92,12 @@ class GithubPlugin(object):
             message += " @%s" % issue['assignee']['login']
 
         message += " " + issue['html_url']
+        # Add labels, if there are any
+        if issue['labels']:
+            labels = ''
+            for label in issue['labels']:
+                labels += ' [%s]' % label['name']
+            message += labels
 
         return message.encode('utf8')
 
