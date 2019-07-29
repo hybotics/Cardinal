@@ -1,13 +1,11 @@
 {
     "nickname": "Cardinal",
     "password": "NICKSERV PASSWORD",
-    "username": "cardinal",
-    "realname": "The most awesome irc bot.",
     "network": "irc.darkscience.net",
     "server_password": "SERVER PASSWORD (IF NECESSARY)",
     "port": 6697,
     "ssl": true,
-    "storage": "storage/",
+    "storage": "/storage/",
     "channels": [
         "#bots"
     ],
@@ -57,22 +55,22 @@
                 "encoding": "utf8"
             },
 
-			"null": {
-				"class": "logging.NullHandler"
-			}
+            "null": {
+                "class": "logging.NullHandler"
+            }
         },
 
-		"loggers": {
-			"": {
-				"level": "DEBUG",
-				"handlers": ["console", "file"]
-			},
+        "loggers": {
+            "": {
+                "level": "DEBUG",
+                "handlers": ["console", "file"]
+            },
 
-			"cardinal.bot.irc": {
-				"propagate": false,
-				"level": "INFO",
-				"handlers": ["null"]
-			}
-		}
+            "cardinal.bot.irc": {
+                "propagate": false,
+                "level": "INFO",
+                "handlers": ["null"]
+            }
+        }
     }
 }
