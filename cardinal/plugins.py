@@ -22,6 +22,8 @@ from cardinal.exceptions import (
     PluginError,
 )
 
+from twisted.internet import defer
+
 
 class PluginManager(object):
     """Keeps track of, loads, and unloads plugins."""
@@ -761,8 +763,8 @@ class PluginManager(object):
             if (hasattr(command, 'commands') and
                     get_command.group(1) in command.commands):
                 # Matched this command, so call it.
-                called_command = True
                 self._call_command(command, user, channel, message)
+                called_command = True
                 continue
 
         # Since standard command regex wasn't found, there's no need to raise
@@ -779,29 +781,23 @@ class PluginManager(object):
         )
 
     def _call_command(self, command, user, channel, message):
-        spec = inspect.getargspec(command)
+        """Calls a command method and treats it as a Deferred.
 
-        args = {}
+        Keyword arguments:
+          command -- A callable for the command that may return a Deferred.
+          user -- A tuple containing a user's nick, ident, and hostname.
+          channel -- A string representing where replies should be sent.
+          message -- A string containing a message received by CardinalBot.
+        """
+        args = (self.cardinal, user, channel, message)
 
-        # Cardinal instance
-        if 'cardinal' in spec.args:
-            args['cardinal'] = self.cardinal
+        d = defer.maybeDeferred(
+            command, *args)
 
-        # Channel
-        if 'channel' in spec.args:
-            args['channel'] = channel
+        def errback(failure):
+            self.logger.error('Unhandled error: {}'.format(failure))
 
-        # User tuple
-        if 'user' in spec.args:
-            args['user'] = user
-
-        # Message
-        if 'message' in spec.args:
-            args['message'] = message
-        if 'msg' in spec.args:
-            args['msg'] = message
-
-        command(**args)
+        d.addErrback(errback)
 
 
 class EventManager(object):
@@ -968,31 +964,65 @@ class EventManager(object):
             (len(callbacks), name)
         )
 
-        accepted = False
+        cb_deferreds = []
         for callback_id, callback in callbacks.iteritems():
-            try:
-                callback(self.cardinal, *params)
+            d = defer.maybeDeferred(
+                callback, self.cardinal, *params)
+
+            def success(_result):
                 self.logger.debug(
-                    "Callback %s accepted event: %s" %
-                    (callback_id, name)
-                )
-                accepted = True
-            # If this exception is received, the plugin told us not to set the
-            # called flag true, so we can just log it and continue on. This
-            # might happen if a plugin realizes the event does not apply to it
-            # and wants the original caller to handle it normally.
-            except EventRejectedMessage:
-                self.logger.debug(
-                    "Callback %s rejected event: %s" %
-                    (callback_id, name)
-                )
-            except Exception:
-                self.logger.exception(
-                    "Exception during callback %s for event: %s" %
-                    (callback_id, name)
+                    "Callback {} accepted event '{}'"
+                    .format(callback_id, name)
                 )
 
-        return accepted
+                return True
+            d.addCallback(success)
+
+            def eventRejectedErrback(failure):
+                # If this exception is received, the plugin told us not to set
+                # the called flag true, so we can just log it and continue on.
+                # This might happen if a plugin realizes the event does not
+                # apply to it and wants the original caller to handle it
+                # normally.
+                failure.trap(EventRejectedMessage)
+
+                self.logger.debug(
+                    "Callback {} rejected event '{}'"
+                    .format(callback_id, name)
+                )
+
+                return False
+            d.addErrback(eventRejectedErrback)
+
+            def errback(failure):
+                self.logger.error(
+                    "Unhandled error during callback {} for event '{}': {}"
+                    .format(callback_id, name, failure)
+                )
+
+                return False
+            d.addErrback(errback)
+
+            cb_deferreds.append(d)
+
+        dl = defer.DeferredList(cb_deferreds)
+        dl.addCallback(self._reduce_callback_accepted_statuses)
+        return dl
+
+    @staticmethod
+    def _reduce_callback_accepted_statuses(results):
+        """Returns True if an event callback accepted the event.
+
+        This is a callback added to a DeferredList representing each of the
+        event callback Deferreds. If any one of them accepted the event, return
+        True back to the caller that fired the event.
+        """
+        for res in results:
+            success, result = res
+            if success and result is True:
+                return True
+
+        return False
 
     def _add_callback(self, event_name, callback):
         """Adds a callback to the event's callback list and returns an ID.
