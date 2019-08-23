@@ -21,30 +21,6 @@ USER_REGEX = re.compile(r'^(.*?)!(.*?)@(.*?)$')
 class CardinalBot(irc.IRCClient, object):
     """Cardinal, in all its glory"""
 
-    logger = None
-    """Logging object for CardinalBot"""
-
-    factory = None
-    """Should contain an instance of CardinalBotFactory"""
-
-    user_regex = re.compile(r'^(.*?)!(.*?)@(.*?)$')
-    """Regex for identifying a user's nick, ident, and vhost"""
-
-    plugin_manager = None
-    """Instance of PluginManager"""
-
-    event_manager = None
-    """Instance of EventManager"""
-
-    storage_path = None
-    """Location of storage directory"""
-
-    uptime = None
-    """Time that Cardinal connected to the network"""
-
-    booted = None
-    """Time that Cardinal was first launched"""
-
     @property
     def network(self):
         return self.factory.network
@@ -103,6 +79,23 @@ class CardinalBot(irc.IRCClient, object):
         self.logger = logging.getLogger(__name__)
         self.irc_logger = logging.getLogger("%s.irc" % __name__)
 
+        # Setup EventManager
+        self.event_manager = EventManager(self)
+
+        # Register events
+        self.event_manager.register("irc.raw", 2)
+        self.event_manager.register("irc.invite", 2)
+        self.event_manager.register("irc.joined", 1)
+        self.event_manager.register("irc.privmsg", 3)
+        self.event_manager.register("irc.notice", 3)
+        self.event_manager.register("irc.nick", 2)
+        self.event_manager.register("irc.mode", 3)
+        self.event_manager.register("irc.topic", 3)
+        self.event_manager.register("irc.join", 2)
+        self.event_manager.register("irc.part", 3)
+        self.event_manager.register("irc.kick", 4)
+        self.event_manager.register("irc.quit", 2)
+
         # State variables for the WHO command
         self.who_lock = {}
         self.who_cache = {}
@@ -120,32 +113,13 @@ class CardinalBot(irc.IRCClient, object):
         # interface for error handling or metadata retention.
         self.factory.cardinal = self
 
+        # Setup PluginManager
+        self.plugin_manager = PluginManager(self, self.factory.plugins)
+
         # Attempt to identify with NickServ, if a password was given
         if self.factory.password:
             self.logger.info("Attempting to identify with NickServ")
             self.msg("NickServ", "IDENTIFY %s" % (self.factory.password,))
-
-        # Creates an instance of EventManager
-        self.logger.debug("Creating new EventManager instance")
-        self.event_manager = EventManager(self)
-
-        # Register events
-        self.event_manager.register("irc.raw", 2)
-        self.event_manager.register("irc.invite", 2)
-        self.event_manager.register("irc.privmsg", 3)
-        self.event_manager.register("irc.notice", 3)
-        self.event_manager.register("irc.nick", 2)
-        self.event_manager.register("irc.mode", 3)
-        self.event_manager.register("irc.topic", 3)
-        self.event_manager.register("irc.join", 2)
-        self.event_manager.register("irc.part", 3)
-        self.event_manager.register("irc.kick", 4)
-        self.event_manager.register("irc.quit", 2)
-
-        # Create an instance of PluginManager, giving it an instance of ourself
-        # to pass to plugins, as well as a list of initial plugins to load.
-        self.logger.debug("Creating new PluginManager instance")
-        self.plugin_manager = PluginManager(self, self.factory.plugins)
 
         # Attempt to join channels
         for channel in self.factory.channels:
@@ -490,56 +464,14 @@ class CardinalBot(irc.IRCClient, object):
 class CardinalBotFactory(protocol.ClientFactory):
     """The interface between Cardinal and the Twisted library"""
 
-    logger = None
-    """Logger object for CardinalBotFactory"""
-
     protocol = CardinalBot
     """Tells Twisted to look at the CardinalBot class for a client"""
 
-    disconnect = False
-    """Keeps track of whether disconnect was triggered by CardinalBot"""
-
-    network = None
-    """Network to connect to"""
-
-    server_password = None
-    """Network password, if any"""
-
-    nickname = None
-    """Nick to connect with"""
-
-    password = None
-    """NickServ password, if any"""
-
-    ident = None
-    """The bot's ident, if any.  Uses the nickname otherwise."""
-
-    realname = None
-    """Real name field"""
-
-    channels = []
-    """Channels to join upon connection"""
-
-    plugins = []
-    """Plugins to load upon connection"""
-
-    cardinal = None
-    """When CardinalBot is started, holds its instance"""
-
-    minimum_reconnection_wait = 10
+    MINIMUM_RECONNECTION_WAIT = 10
     """Minimum time in seconds before reconnection attempt"""
 
-    maximum_reconnection_wait = 300
+    MAXIMUM_RECONNECTION_WAIT = 300
     """Maximum time in connections before reconnection attempt"""
-
-    last_reconnection_wait = None
-    """Time in seconds since last reconnection attempt"""
-
-    booted = None
-    """Datetime object holding time Cardinal first started up"""
-
-    reloads = 0
-    """Keeps track of plugin reloads from within Cardinal"""
 
     def __init__(self, network, server_password=None, channels=None,
                  nickname='Cardinal', password=None, username=None,
@@ -576,7 +508,21 @@ class CardinalBotFactory(protocol.ClientFactory):
         # Register SIGINT handler, so we can close the connection cleanly
         signal.signal(signal.SIGINT, self._sigint)
 
+        # Cardinal will set an instance of itself here later
+        self.cardinal = None
+
+        # This will be set to True when we don't want to trigger reconnection
+        # logic.
+        self.disconnect = False
+
+        # The time we first connected to the network with Cardinal
         self.booted = datetime.now()
+
+        # Track reload state across reconnections
+        self.reloads = 0
+
+        # Used for backing off when reconnecting
+        self.last_reconnection_wait = None
 
     def _sigint(self, signal, frame):
         """Called when a SIGINT is received.
@@ -600,14 +546,14 @@ class CardinalBotFactory(protocol.ClientFactory):
         if not self.disconnect:
             self.logger.info(
                 "Connection lost (%s), reconnecting in %d seconds." %
-                (reason, self.minimum_reconnection_wait)
+                (reason, self.MINIMUM_RECONNECTION_WAIT)
             )
 
             # Reset the last reconnection wait time since this is the first
             # time we've disconnected since a successful connection and then
             # wait before connecting.
-            self.last_reconnection_wait = self.minimum_reconnection_wait
-            time.sleep(self.minimum_reconnection_wait)
+            self.last_reconnection_wait = self.MINIMUM_RECONNECTION_WAIT
+            time.sleep(self.MINIMUM_RECONNECTION_WAIT)
             connector.connect()
         else:
             self.logger.info(
@@ -626,14 +572,14 @@ class CardinalBotFactory(protocol.ClientFactory):
         # If we disconnected on our first connection attempt, then we don't
         # need to calculate a wait time, we can just use the minimum time
         if not self.last_reconnection_wait:
-            wait_time = self.minimum_reconnection_wait
+            wait_time = self.MINIMUM_RECONNECTION_WAIT
         else:
             # We'll attempt to reconnect after waiting twice as long as the
             # last time we waited, unless it exceeds the maximum wait time, in
             # which case we'll wait that long instead
             wait_time = self.last_reconnection_wait * 2
-            if wait_time > self.maximum_reconnection_wait:
-                wait_time = self.maximum_reconnection_wait
+            if wait_time > self.MAXIMUM_RECONNECTION_WAIT:
+                wait_time = self.MAXIMUM_RECONNECTION_WAIT
 
         self.logger.info(
             "Could not connect (%s), retrying in %d seconds" %
