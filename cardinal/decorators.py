@@ -1,5 +1,4 @@
 import re
-import functools
 
 
 _RETYPE = type(re.compile('foobar'))
@@ -27,12 +26,8 @@ def regex(expression):
         raise TypeError("Regular expression must be a string or regex type")
 
     def wrap(f):
-        @functools.wraps(f)
-        def inner(*args, **kwargs):
-            return f(*args, **kwargs)
-
-        inner.regex = expression
-        return inner
+        f.regex = expression
+        return f
 
     return wrap
 
