@@ -1,60 +1,55 @@
 # coding: iso-8859-15
-
+from __future__ import absolute_import, print_function, division
 import re
 import urllib2
 import HTMLParser
 import logging
-
 from datetime import datetime
 
-URL_REGEX = re.compile(r"(?:^|\s)((?:https?://)?"
-                       "(?:[a-z0-9.\-]+[.][a-z]{2,4}/?)"
-                       "(?:[^\s()<>]*|\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\))"
-                       "+(?:\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\)|[^\s`!()"
-                       "\[\]{};:\'\".,<>?]))", flags=re.IGNORECASE | re.DOTALL)
+from twisted.internet import defer
 
+from cardinal.decorators import regex
+
+URL_REGEX = re.compile(r"(?:^|\s)((?:https?://)?(?:[a-z0-9.\-]+[.][a-z]{2,4}/?"
+                       r")(?:[^\s()<>]*|\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\)"
+                       r")+(?:\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))*\)|[^\s`!()"
+                       r"\[\]{};:\'\".,<>?]))",
+                       flags=re.IGNORECASE | re.DOTALL)
 TITLE_REGEX = re.compile(r'<title(\s+.*?)?>(.*?)</title>',
                          flags=re.IGNORECASE | re.DOTALL)
 
 
 class URLsPlugin(object):
-    logger = None
-    """Logging object for URLsPlugin"""
-
-    timeout = 10
+    TIMEOUT = 10
     """Timeout in seconds before bailing on loading page"""
 
-    read_bytes = 524288
+    READ_BYTES = 524288
     """Bytes to read before bailing on loading page (512KB)"""
 
-    lookup_cooloff = 10
+    LOOKUP_COOLOFF = 10
     """Timeout in seconds before looking up the same URL again"""
-
-    last_url = None
-    """Holds the last URL looked up, for cooloff"""
-
-    last_url_at = None
-    """Holds time last URL was looked up, for cooloff"""
 
     def __init__(self, cardinal, config):
         # Initialize logger
         self.logger = logging.getLogger(__name__)
 
-        # Only check config if it exists
-        if config is None:
-            return
+        # Holds the last URL looked up, for cooloff
+        self.last_url = None
 
-        if 'timeout' in config:
-            self.timeout = config['timeout']
+        # Holds time last URL was looked up, for cooloff
+        self.last_url_at = None
 
-        if 'read_bytes' in config:
-            self.read_bytes = config['read_bytes']
+        # If config doesn't exist, use an empty dict
+        config = config or {}
 
-        if 'lookup_cooloff' in config:
-            self.lookup_cooloff = config['lookup_cooloff']
+        self.timeout = config.get('timeout', self.TIMEOUT)
+        self.read_bytes = config.get('read_bytes', self.READ_BYTES)
+        self.lookup_cooloff = config.get('lookup_cooloff', self.LOOKUP_COOLOFF)
 
         cardinal.event_manager.register('urls.detection', 2)
 
+    @regex(URL_REGEX)
+    @defer.inlineCallbacks
     def get_title(self, cardinal, user, channel, msg):
         # Find every URL within the message
         urls = re.findall(URL_REGEX, msg)
@@ -67,19 +62,23 @@ class URLsPlugin(object):
             if (url == self.last_url and self.last_url_at and
                     (datetime.now() - self.last_url_at).seconds <
                     self.lookup_cooloff):
-                return
+                defer.returnValue(None)
 
             self.last_url = url
             self.last_url_at = datetime.now()
 
             # Check if another plugin has hooked into this URL and wants to
             # provide information itself
-            if cardinal.event_manager.fire('urls.detection', channel, url):
-                return
+            hooked = yield cardinal.event_manager.fire(
+                'urls.detection', channel, url)
 
-            # Attempt to load the page, timing out after ten seconds
+            if hooked:
+                defer.returnValue(None)
+
+            # FIXME: Replace with Twisted call
             try:
                 o = urllib2.build_opener()
+                # User agent helps combat some bot checks
                 o.addheaders = [
                     ('User-agent', 'Mozilla/5.0 (Windows NT 6.2; Win64; x64) '
                                    'AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -88,13 +87,13 @@ class URLsPlugin(object):
                 f = o.open(url, timeout=self.timeout)
             except Exception:
                 self.logger.exception("Unable to load URL: %s" % url)
-                return
+                defer.returnValue(None)
 
             # Attempt to find the title
             content_type = f.info()['content-type']
             if not ('text/html' in content_type or
                     'text/xhtml' in content_type):
-                return
+                defer.returnValue(None)
             content = f.read(self.read_bytes)
             f.close()
 
@@ -112,8 +111,6 @@ class URLsPlugin(object):
 
                     cardinal.sendMsg(channel, "URL Found: %s" % title_to_send)
                     continue
-
-    get_title.regex = URL_REGEX
 
     def close(self, cardinal):
         cardinal.event_manager.remove('urls.detection')
