@@ -25,10 +25,6 @@ class ConfigNotFoundError(CardinalException):
     """Raised when an expected plugin config isn't found."""
 
 
-class AmbiguousConfigError(CardinalException):
-    """Raised when multiple configs exist for a plugin."""
-
-
 class EventAlreadyExistsError(CardinalException):
     """Raised durring attempt to register an event name already registered."""
 
