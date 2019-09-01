@@ -18,7 +18,7 @@ sys.path.insert(0, FIXTURE_PATH)
 
 
 class TestPluginManager(object):
-    def setup_method(self, method):
+    def setup_method(self):
         mock_cardinal = self.cardinal = Mock(spec=CardinalBot)
 
         self.plugin_manager = PluginManager(
@@ -333,7 +333,7 @@ class TestPluginManager(object):
 
 
 class TestEventManager(object):
-    def setup_method(self, method):
+    def setup_method(self):
         mock_cardinal = self.cardinal = Mock(spec=CardinalBot)
         self.event_manager = EventManager(mock_cardinal)
 
